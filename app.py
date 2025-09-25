@@ -132,6 +132,9 @@ def admin_settings():
             else:
                 flash("Invalid WhatsApp number format. Use + and digits only.", "danger")
         return redirect(url_for("admin_settings"))
+    # GET
+    site = _site()
+    return render_template("admin_settings.html", site=site)
 
 
 # ---------- Template Context ----------
@@ -181,8 +184,9 @@ def admin_item_update():
     description = request.form.get("description")
     price = request.form.get("price")
     image_url = request.form.get("image_url")
+    quantity = request.form.get("quantity")
     try:
-        update_item(iid, name, description, price, image_url)
+        update_item(iid, name, description, price, image_url, quantity)
         flash("Item updated", "success")
     except Exception as e:
         flash(f"Update failed: {e}", "danger")
