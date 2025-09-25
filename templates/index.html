@@ -11,6 +11,7 @@
       <div class="col-12">
         <h3 class="border-bottom pb-2">{{ cat.name }}</h3>
         {% set items = items_by_cat.get(cat.id, []) %}
+        {% if items %}
           <div class="row g-3 mb-4">
             {% for item in items %}
               <div class="col-md-6">
@@ -37,6 +38,7 @@
                 </div>
               </div>
             {% endfor %}
+          </div>
         {% else %}
           <p class="text-muted">No items yet.</p>
         {% endif %}
