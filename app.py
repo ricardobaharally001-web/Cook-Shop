@@ -10,6 +10,7 @@ from supabase_helpers import (
     create_item,
     get_site_setting,
     set_site_setting,
+    upload_logo_to_supabase,
 )
 
 load_dotenv()
@@ -32,6 +33,7 @@ def index():
     site = {
         "brand_name": get_site_setting("brand_name") or "Restaurant Menu",
         "logo_url": get_site_setting("logo_url") or "",
+        "dark_mode": (get_site_setting("dark_mode") or "0") in ("1", "true", "True", "on"),
     }
     categories = list_categories()
     items_by_cat = {c["id"]: list_items_for_category(c["id"]) for c in categories}
@@ -68,6 +70,7 @@ def admin_home():
     site = {
         "brand_name": get_site_setting("brand_name") or "Restaurant Menu",
         "logo_url": get_site_setting("logo_url") or "",
+        "dark_mode": (get_site_setting("dark_mode") or "0") in ("1", "true", "True", "on"),
     }
     return render_template("admin.html", site=site)
 
@@ -78,16 +81,46 @@ def admin_settings():
         return redirect(url_for("admin_login"))
     if request.method == "POST":
         brand_name = request.form.get("brand_name", "").strip()
+        dark_mode = request.form.get("dark_mode") == "on"
         if brand_name:
             set_site_setting("brand_name", brand_name)
             flash("Brand name updated", "success")
         else:
             flash("Brand name cannot be empty", "danger")
+        set_site_setting("dark_mode", "1" if dark_mode else "0")
         return redirect(url_for("admin_settings"))
     site = {
         "brand_name": get_site_setting("brand_name") or "Restaurant Menu",
+        "dark_mode": (get_site_setting("dark_mode") or "0") in ("1", "true", "True", "on"),
     }
     return render_template("admin_settings.html", site=site)
+
+
+# ---------- Branding (Logo Upload) ----------
+
+@app.route("/admin/branding", methods=["GET", "POST"]) 
+def admin_branding():
+    if not is_logged_in():
+        return redirect(url_for("admin_login"))
+    site = {
+        "brand_name": get_site_setting("brand_name") or "Restaurant Menu",
+        "logo_url": get_site_setting("logo_url") or "",
+        "dark_mode": (get_site_setting("dark_mode") or "0") in ("1", "true", "True", "on"),
+    }
+    if request.method == "POST":
+        file = request.files.get("logo")
+        if not file or not file.filename.strip():
+            flash("Please choose an image file.", "danger")
+            return redirect(url_for("admin_branding"))
+        try:
+            url = upload_logo_to_supabase(file)
+            set_site_setting("logo_url", url)
+            flash("Logo updated!", "success")
+            site["logo_url"] = url
+        except Exception as e:
+            flash(f"Upload failed: {e}", "danger")
+        return redirect(url_for("admin_branding"))
+    return render_template("admin_branding.html", site=site, current_logo=site.get("logo_url"))
 
 
 # ---------- Categories ----------
