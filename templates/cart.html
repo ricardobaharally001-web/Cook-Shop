@@ -27,7 +27,7 @@
             <td>${{ '%.2f'|format(row.line_total) }}</td>
             <td>
               <form method="post" action="/cart/remove">
-                <input type="hidden" name="item_id" value="{{ row.item.id }}">t
+                <input type="hidden" name="item_id" value="{{ row.item.id }}">
                 <button class="btn btn-sm btn-outline-danger">Remove</button>
               </form>
             </td>
@@ -60,7 +60,7 @@
           <h5 class="modal-title" id="customerNameModalLabel">Enter Your Name</h5>
           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
         </div>
-        <form method="post" action="/cart/checkout">
+        <form method="post" action="/cart/checkout" onsubmit="closeModalAndShowSuccess()">
           <div class="modal-body">
             <div class="mb-3">
               <label for="customerName" class="form-label">Full Name <span class="text-danger">*</span></label>
@@ -76,4 +76,36 @@
       </div>
     </div>
   </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function closeModalAndShowSuccess() {
+  // Close the modal
+  const modal = bootstrap.Modal.getInstance(document.getElementById('customerNameModal'));
+  if (modal) {
+    modal.hide();
+  }
+  
+  // Show success message
+  setTimeout(function() {
+    // Create and show a temporary success alert
+    const alertDiv = document.createElement('div');
+    alertDiv.className = 'alert alert-success alert-dismissible fade show position-fixed';
+    alertDiv.style.cssText = 'top: 20px; right: 20px; z-index: 9999; min-width: 300px;';
+    alertDiv.innerHTML = `
+      <strong>📱 Order Sent!</strong> Redirecting you to WhatsApp...
+      <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    document.body.appendChild(alertDiv);
+    
+    // Auto-dismiss after 3 seconds
+    setTimeout(function() {
+      if (alertDiv.parentNode) {
+        alertDiv.remove();
+      }
+    }, 3000);
+  }, 500);
+}
+</script>
 {% endblock %}
