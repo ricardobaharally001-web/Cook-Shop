@@ -34,3 +34,102 @@
 }
 .theme-dark a { color: #c9d1d9; }
 .theme-dark .text-muted { color: #b5b5b5 !important; }
+
+/* Bubbly + smooth look */
+:root {
+  --radius-lg: 14px;
+  --radius-md: 10px;
+  --radius-pill: 999px;
+  --shadow-sm: 0 4px 10px rgba(0,0,0,0.06);
+  --shadow-md: 0 10px 24px rgba(0,0,0,0.08);
+}
+
+.card, .list-group-item, .alert, .form-control, .form-select, .btn {
+  border-radius: var(--radius-md) !important;
+}
+
+.navbar {
+  box-shadow: var(--shadow-sm);
+}
+
+.card {
+  box-shadow: var(--shadow-sm);
+  transition: transform .18s ease, box-shadow .18s ease;
+}
+
+.card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+.list-group-item {
+  border-radius: var(--radius-md) !important;
+  margin-bottom: .5rem;
+  transition: transform .16s ease, box-shadow .16s ease, background-color .16s ease;
+}
+
+.list-group-item:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-sm);
+}
+
+.btn {
+  border-radius: var(--radius-pill) !important;
+  transition: transform .12s ease, box-shadow .12s ease, opacity .12s ease;
+}
+
+.btn:active {
+  transform: translateY(1px) scale(0.98);
+}
+
+/* Item tiles on index */
+.list-group-item.p-3.d-flex.align-items-center {
+  background: #fff;
+}
+
+.theme-dark .list-group-item.p-3.d-flex.align-items-center {
+  background: #1c1c1c;
+}
+
+/* Logo avatar */
+.logo-avatar {
+  height: 28px;
+  width: 28px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: #fff;
+}
+
+/* Cart badge */
+.cart-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  font-size: 12px;
+  border-radius: var(--radius-pill);
+  background: #ffc107;
+  color: #212529;
+  font-weight: 600;
+}
+
+/* Flash alert animation */
+.alert {
+  animation: slideFadeIn .2s ease;
+}
+@keyframes slideFadeIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Add-to-cart pulse */
+#cartBtn.added {
+  animation: pulse .4s ease;
+}
+@keyframes pulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.04); }
+  100% { transform: scale(1); }
+}
