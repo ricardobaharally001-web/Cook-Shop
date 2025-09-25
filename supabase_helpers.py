@@ -1,4 +1,6 @@
 import os
+import io
+from datetime import datetime
 from supabase import create_client
 
 # Reuse the same pattern as take-2-main for env + client
@@ -92,3 +94,52 @@ def set_site_setting(key: str, value: str):
     except Exception:
         # Fallback to insert
         sb.table("site_settings").insert({"key": key, "value": value}).execute()
+
+
+# --- Assets upload (logo) ---
+
+def _public_url(bucket: str, path: str) -> str:
+    url, _ = _get_env()
+    return f"{url}/storage/v1/object/public/{bucket}/{path}"
+
+
+def upload_logo_to_supabase(file_storage) -> str:
+    """Upload a logo to the assets bucket and return its public URL."""
+    filename = file_storage.filename or "logo.png"
+    stamp = datetime.utcnow().strftime("%Y%m%d-%H%M%S")
+    ext = (filename.rsplit(".", 1)[-1] if "." in filename else "png").lower()
+    key = f"branding/logo_{stamp}.{ext}"
+    data = file_storage.read()
+    file_storage.seek(0)
+    client = supabase()
+    mime = "image/svg+xml" if ext == "svg" else f"image/{ext}"
+    # Try multiple call signatures for compatibility
+    last_err = None
+    try:
+        client.storage.from_(SUPABASE_ASSETS_BUCKET).upload(
+            path=key,
+            file=data,
+            file_options={"contentType": mime, "cacheControl": "3600", "upsert": True},
+        )
+    except Exception as e_a:
+        last_err = e_a
+        try:
+            client.storage.from_(SUPABASE_ASSETS_BUCKET).upload(
+                path=key,
+                file=data,
+                file_options={"contentType": mime, "cacheControl": "3600"},
+                upsert=True,
+            )
+        except Exception as e_b:
+            last_err = e_b
+            try:
+                client.storage.from_(SUPABASE_ASSETS_BUCKET).upload(
+                    path=key,
+                    file=io.BytesIO(data),
+                    file_options={"contentType": mime, "cacheControl": "3600"},
+                    upsert=True,
+                )
+            except Exception as e_c:
+                last_err = e_c
+                raise RuntimeError(f"Supabase upload failed: {last_err}")
+    return _public_url(SUPABASE_ASSETS_BUCKET, key)
