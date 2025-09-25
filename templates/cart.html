@@ -1,0 +1,57 @@
+{% extends 'base.html' %}
+{% block content %}
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h2 class="m-0">Your Cart</h2>
+    <a class="btn btn-outline-secondary btn-sm" href="/">Continue browsing</a>
+  </div>
+
+  {% if items %}
+    <div class="table-responsive mb-3">
+      <table class="table align-middle">
+        <thead>
+          <tr>
+            <th>Item</th>
+            <th style="width:120px">Qty</th>
+            <th style="width:140px">Line Total</th>
+            <th style="width:120px"></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in items %}
+          <tr>
+            <td>
+              <div class="fw-semibold">{{ row.item.name }}</div>
+              {% if row.item.description %}<div class="small text-muted">{{ row.item.description }}</div>{% endif %}
+            </td>
+            <td>{{ row.qty }}</td>
+            <td>${{ '%.2f'|format(row.line_total) }}</td>
+            <td>
+              <form method="post" action="/cart/remove">
+                <input type="hidden" name="item_id" value="{{ row.item.id }}">
+                <button class="btn btn-sm btn-outline-danger">Remove</button>
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center">
+          <div>
+            <div class="fw-semibold">Subtotal</div>
+            <div class="h5 m-0">${{ '%.2f'|format(subtotal) }}</div>
+          </div>
+          <form method="post" action="/cart/checkout" class="d-flex align-items-center gap-2">
+            <input type="text" class="form-control" name="customer_name" placeholder="Your name (optional)">
+            <button class="btn btn-success">Checkout with WhatsApp</button>
+          </form>
+        </div>
+      </div>
+    </div>
+  {% else %}
+    <p class="text-muted">Your cart is empty.</p>
+  {% endif %}
+{% endblock %}
