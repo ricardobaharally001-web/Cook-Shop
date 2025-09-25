@@ -193,17 +193,28 @@ def admin_item_update():
     return redirect(url_for("admin_items"))
 
 
-@app.post("/admin/items/delete")
-def admin_item_delete():
+@app.route("/admin/items/edit/<int:item_id>", methods=["GET", "POST"])
+def admin_item_edit(item_id):
     if not is_logged_in():
         return redirect(url_for("admin_login"))
-    iid = request.form.get("id")
-    try:
-        delete_item(iid)
-        flash("Item deleted", "info")
-    except Exception as e:
-        flash(f"Delete failed: {e}", "danger")
-    return redirect(url_for("admin_items"))
+    item = get_item(item_id)
+    if not item:
+        flash("Item not found", "danger")
+        return redirect(url_for("admin_items"))
+    cats = list_categories()
+    if request.method == "POST":
+        name = request.form.get("name")
+        description = request.form.get("description")
+        price = request.form.get("price")
+        quantity = request.form.get("quantity")
+        image_url = request.form.get("image_url")
+        try:
+            update_item(item_id, name, description, price, image_url, quantity)
+            flash("Item updated", "success")
+            return redirect(url_for("admin_items"))
+        except Exception as e:
+            flash(f"Update failed: {e}", "danger")
+    return render_template("admin_item_edit.html", item=item, categories=cats)
 
 
 # ---------- Categories ----------
@@ -309,20 +320,25 @@ def cart_remove():
         flash("Removed item", "info")
     return redirect(url_for("cart_view"))
 
-
-@app.route("/cart/checkout", methods=["POST"]) 
 def cart_checkout():
-    site = _site()
-    whatsapp_phone = site.get("whatsapp_phone")
-    customer_name = request.form.get("customer_name", "").strip() or "Guest"
     cart = _cart()
     if not cart:
         flash("Your cart is empty", "warning")
-        return redirect(url_for("cart_view"))
-    # Build message
-    lines = []
-    lines.append(f"Order for {customer_name}")
-    lines.append("--------------------------------")
+        return redirect(url_for("cart"))
+
+    customer_name = request.form.get("customer_name", "").strip()
+    if not customer_name:
+        flash("Please enter your name for the order", "danger")
+        return redirect(url_for("cart"))
+
+    site = _site()
+    whatsapp_phone = site.get("whatsapp_phone") if site else None
+    if not whatsapp_phone:
+        flash("WhatsApp checkout is not configured", "warning")
+        return redirect(url_for("cart"))
+
+    lines = [f"🛒 Order from {customer_name}"]
+    lines.append("=" * 30)
     subtotal = 0.0
     for item_id, qty in cart.items():
         itm = get_item(item_id)
@@ -332,13 +348,12 @@ def cart_checkout():
         line_total = price * int(qty)
         subtotal += line_total
         lines.append(f"{itm['name']} x{qty} - ${line_total:.2f}")
-    # Decrement inventory after building message
-    for item_id, qty in cart.items():
+        # Decrement inventory
         try:
             change_item_quantity(item_id, -int(qty))
         except Exception:
             pass
-    lines.append("--------------------------------")
+    lines.append("=" * 30)
     lines.append(f"Subtotal: ${subtotal:.2f}")
     message = "\n".join(lines)
 
@@ -350,9 +365,5 @@ def cart_checkout():
         session.pop("cart", None)
         return redirect(url)
     else:
-        flash("WhatsApp is not configured. Set a phone number in Admin → Settings.", "danger")
-        return redirect(url_for("admin_settings"))
-
-
-if __name__ == "__main__":
-    app.run(debug=True, host="0.0.0.0", port=int(os.environ.get("PORT", "5000")))
+        flash("WhatsApp checkout is not configured", "warning")
+        return redirect(url_for("cart"))
