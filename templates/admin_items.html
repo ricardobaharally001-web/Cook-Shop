@@ -1,0 +1,72 @@
+{% extends 'base.html' %}
+{% block content %}
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h2 class="m-0">Manage Items</h2>
+    <div>
+      <a class="btn btn-outline-secondary btn-sm" href="/admin">Back</a>
+    </div>
+  </div>
+
+  <form method="post" class="card shadow-sm mb-4">
+    <div class="card-body">
+      <div class="row g-3">
+        <div class="col-md-4">
+          <label class="form-label">Category</label>
+          <select class="form-select" name="category_id" required>
+            <option value="" disabled selected>Choose category</option>
+            {% for c in categories %}
+            <option value="{{ c.id }}">{{ c.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Item Name</label>
+          <input type="text" class="form-control" name="name" placeholder="e.g., Curry" required>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Price (optional)</label>
+          <input type="number" step="0.01" min="0" class="form-control" name="price" placeholder="e.g., 9.99">
+        </div>
+        <div class="col-12">
+          <label class="form-label">Description (optional)</label>
+          <textarea class="form-control" name="description" rows="2" placeholder="Short description"></textarea>
+        </div>
+      </div>
+      <div class="mt-3">
+        <button class="btn btn-dark">Add Item</button>
+      </div>
+    </div>
+  </form>
+
+  <div class="card shadow-sm">
+    <div class="card-body">
+      <h5 class="card-title">Existing Items</h5>
+      {% if items %}
+        <div class="table-responsive">
+          <table class="table align-middle">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Description</th>
+                <th>Price</th>
+                <th>Category ID</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for i in items %}
+              <tr>
+                <td>{{ i.name }}</td>
+                <td class="small text-muted">{{ i.description }}</td>
+                <td>{% if i.price is not none %}${{ '%.2f'|format(i.price) }}{% endif %}</td>
+                <td>{{ i.category_id }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <p class="text-muted">No items yet.</p>
+      {% endif %}
+    </div>
+  </div>
+{% endblock %}

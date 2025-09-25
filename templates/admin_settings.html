@@ -1,0 +1,19 @@
+{% extends 'base.html' %}
+{% block content %}
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h2 class="m-0">Site Settings</h2>
+    <div>
+      <a class="btn btn-outline-secondary btn-sm" href="/admin">Back</a>
+    </div>
+  </div>
+
+  <form method="post" class="card shadow-sm">
+    <div class="card-body">
+      <div class="mb-3">
+        <label class="form-label">Brand Name</label>
+        <input type="text" class="form-control" name="brand_name" value="{{ site.brand_name }}" required>
+      </div>
+      <button class="btn btn-dark">Save</button>
+    </div>
+  </form>
+{% endblock %}
