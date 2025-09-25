@@ -36,7 +36,12 @@
           <textarea class="form-control" name="description" rows="2" placeholder="Short description">{{ item.description }}</textarea>
         </div>
         <div class="col-12">
-          <label class="form-label">Image URL (optional)</label>
+          <label class="form-label">Upload New Image (optional)</label>
+          <input type="file" class="form-control" name="image" accept="image/*">
+          <div class="form-text">Upload a new image to replace the current one, or leave empty to keep existing image. Supported formats: JPG, PNG, GIF, WebP.</div>
+        </div>
+        <div class="col-12">
+          <label class="form-label">Or Image URL (optional)</label>
           <input type="text" class="form-control" name="image_url" value="{{ item.image_url }}" placeholder="https://...">
           {% if item.image_url %}
             <div class="form-text">Current image shown below.</div>
