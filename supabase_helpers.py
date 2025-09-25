@@ -48,14 +48,23 @@ def create_category(name: str):
 
 def list_items():
     sb = supabase()
-    res = sb.table("menu_items").select("id,name,description,price,image_url,category_id,created_at").order("created_at", desc=True).execute()
-    return res.data or []
+    try:
+        res = sb.table("menu_items").select("id,name,description,price,image_url,category_id,created_at").order("created_at", desc=True).execute()
+        return res.data or []
+    except Exception:
+        # Fallback for older schema without image_url
+        res = sb.table("menu_items").select("id,name,description,price,category_id,created_at").order("created_at", desc=True).execute()
+        return res.data or []
 
 
 def list_items_for_category(category_id: int):
     sb = supabase()
-    res = sb.table("menu_items").select("id,name,description,price,image_url,category_id,created_at").eq("category_id", category_id).order("name").execute()
-    return res.data or []
+    try:
+        res = sb.table("menu_items").select("id,name,description,price,image_url,category_id,created_at").eq("category_id", category_id).order("name").execute()
+        return res.data or []
+    except Exception:
+        res = sb.table("menu_items").select("id,name,description,price,category_id,created_at").eq("category_id", category_id).order("name").execute()
+        return res.data or []
 
 
 def create_item(category_id: int, name: str, description: str | None, price: float | None, image_url: str | None = None):
@@ -142,15 +151,22 @@ def upload_logo_to_supabase(file_storage) -> str:
         except Exception as e_b:
             last_err = e_b
             try:
+                # Minimal call: no file_options, no upsert
                 client.storage.from_(SUPABASE_ASSETS_BUCKET).upload(
                     path=key,
-                    file=io.BytesIO(data),
-                    file_options={"contentType": mime, "cacheControl": "3600"},
-                    upsert=True,
+                    file=data,
                 )
             except Exception as e_c:
                 last_err = e_c
-                raise RuntimeError(f"Supabase upload failed: {last_err}")
+                try:
+                    # BytesIO minimal
+                    client.storage.from_(SUPABASE_ASSETS_BUCKET).upload(
+                        path=key,
+                        file=io.BytesIO(data),
+                    )
+                except Exception as e_d:
+                    last_err = e_d
+                    raise RuntimeError(f"Supabase upload failed: {last_err}")
     return _public_url(SUPABASE_ASSETS_BUCKET, key)
 
 
@@ -171,10 +187,14 @@ def upload_item_image(file_storage) -> str:
             file_options={"contentType": mime, "cacheControl": "3600", "upsert": True},
         )
     except Exception:
-        client.storage.from_(SUPABASE_ASSETS_BUCKET).upload(
-            path=key,
-            file=io.BytesIO(data),
-            file_options={"contentType": mime, "cacheControl": "3600"},
-            upsert=True,
-        )
+        try:
+            client.storage.from_(SUPABASE_ASSETS_BUCKET).upload(
+                path=key,
+                file=data,
+            )
+        except Exception:
+            client.storage.from_(SUPABASE_ASSETS_BUCKET).upload(
+                path=key,
+                file=io.BytesIO(data),
+            )
     return _public_url(SUPABASE_ASSETS_BUCKET, key)
