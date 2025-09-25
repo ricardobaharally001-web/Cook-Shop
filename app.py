@@ -57,6 +57,13 @@ def index():
     return render_template("index.html", site=site, categories=categories, items_by_cat=items_by_cat)
 
 
+@app.route("/toggle-dark")
+def toggle_dark():
+    current = (get_site_setting("dark_mode") or "0") in ("1", "true", "True", "on")
+    set_site_setting("dark_mode", "0" if current else "1")
+    return redirect(request.referrer or url_for("index"))
+
+
 # ---------- Admin Auth ----------
 
 @app.route("/admin/login", methods=["GET", "POST"]) 
@@ -96,12 +103,21 @@ def admin_settings():
         brand_name = request.form.get("brand_name", "").strip()
         dark_mode = request.form.get("dark_mode") == "on"
         whatsapp_phone = request.form.get("whatsapp_phone", "").strip()
+        # Optional logo upload from settings page
+        file = request.files.get("logo")
         if brand_name:
             set_site_setting("brand_name", brand_name)
             flash("Brand name updated", "success")
         else:
             flash("Brand name cannot be empty", "danger")
         set_site_setting("dark_mode", "1" if dark_mode else "0")
+        if file and file.filename.strip():
+            try:
+                url = upload_logo_to_supabase(file)
+                set_site_setting("logo_url", url)
+                flash("Logo updated!", "success")
+            except Exception as e:
+                flash(f"Logo upload failed: {e}", "danger")
         # Basic WhatsApp E.164-like validation: allow + and digits 8-15
         if whatsapp_phone:
             import re
