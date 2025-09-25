@@ -16,8 +16,21 @@
           {% endif %}
           <span>{{ site.brand_name if site and site.brand_name else 'Restaurant Menu' }}</span>
         </a>
-        <div class="ms-auto">
-          <a class="btn btn-outline-light btn-sm" href="/admin">Admin</a>
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navMain" aria-controls="navMain" aria-expanded="false" aria-label="Toggle navigation">
+          <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navMain">
+          <ul class="navbar-nav ms-auto mb-2 mb-lg-0 align-items-lg-center">
+            <li class="nav-item me-2">
+              <a class="btn btn-outline-light btn-sm" href="/cart">Cart</a>
+            </li>
+            <li class="nav-item me-2">
+              <a class="btn btn-outline-light btn-sm" href="/toggle-dark">{% if site and site.dark_mode %}Light Mode{% else %}Dark Mode{% endif %}</a>
+            </li>
+            <li class="nav-item">
+              <a class="btn btn-light btn-sm" href="/admin">Admin</a>
+            </li>
+          </ul>
         </div>
       </div>
     </nav>

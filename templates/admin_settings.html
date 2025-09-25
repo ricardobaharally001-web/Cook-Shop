@@ -7,7 +7,7 @@
     </div>
   </div>
 
-  <form method="post" class="card shadow-sm">
+  <form method="post" class="card shadow-sm" enctype="multipart/form-data">
     <div class="card-body">
       <div class="mb-3">
         <label class="form-label">Brand Name</label>
@@ -16,6 +16,21 @@
       <div class="form-check form-switch mb-3">
         <input class="form-check-input" type="checkbox" role="switch" id="darkModeSwitch" name="dark_mode" {% if site.dark_mode %}checked{% endif %}>
         <label class="form-check-label" for="darkModeSwitch">Enable Dark Mode</label>
+      </div>
+      <div class="mb-3">
+        <label class="form-label">Brand Logo (optional)</label>
+        <input type="file" class="form-control" name="logo" accept="image/*">
+        {% if site.logo_url %}
+          <div class="form-text">Current logo shown below.</div>
+          <div class="mt-2">
+            <img src="{{ site.logo_url }}" alt="Current Logo" style="max-height:80px">
+          </div>
+        {% endif %}
+      </div>
+      <div class="mb-3">
+        <label class="form-label">WhatsApp Phone (optional)</label>
+        <input type="text" class="form-control" name="whatsapp_phone" value="{{ site.whatsapp_phone }}" placeholder="e.g., +18685551234">
+        <div class="form-text">Use international format with country code. Only + and digits are allowed.</div>
       </div>
       <button class="btn btn-dark">Save</button>
     </div>
