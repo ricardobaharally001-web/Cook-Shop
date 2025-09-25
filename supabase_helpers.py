@@ -1,4 +1,5 @@
 import os
+import json
 import io
 from datetime import datetime
 from supabase import create_client
@@ -7,6 +8,17 @@ from supabase import create_client
 SUPABASE_ASSETS_BUCKET = os.environ.get("SUPABASE_ASSETS_BUCKET", "assets")
 
 _client = None
+
+BASE_DIR = os.path.dirname(__file__)
+PRODUCTS_FILE = os.path.join(BASE_DIR, "products.json")
+CATEGORIES_FILE = os.path.join(BASE_DIR, "categories.json")
+
+# Cache timestamps for performance
+_products_cache = None
+_products_cache_time = 0
+_categories_cache = None
+_categories_cache_time = 0
+CACHE_DURATION = 30  # seconds
 
 def _get_env():
     url = os.environ.get("SUPABASE_URL")
@@ -22,107 +34,326 @@ def supabase():
         _client = create_client(url, key)
     return _client
 
+def _load_json_cache():
+    """Load data from JSON cache with timestamp checking"""
+    global _products_cache, _products_cache_time, _categories_cache, _categories_cache_time
+    current_time = datetime.now().timestamp()
+    
+    # Load products cache if expired
+    if _products_cache is None or (current_time - _products_cache_time) > CACHE_DURATION:
+        if os.path.exists(PRODUCTS_FILE):
+            try:
+                with open(PRODUCTS_FILE, 'r', encoding='utf-8') as f:
+                    _products_cache = json.load(f)
+                    _products_cache_time = current_time
+            except Exception:
+                _products_cache = []
+        else:
+            _products_cache = []
+    
+    # Load categories cache if expired
+    if _categories_cache is None or (current_time - _categories_cache_time) > CACHE_DURATION:
+        if os.path.exists(CATEGORIES_FILE):
+            try:
+                with open(CATEGORIES_FILE, 'r', encoding='utf-8') as f:
+                    _categories_cache = json.load(f)
+                    _categories_cache_time = current_time
+            except Exception:
+                _categories_cache = [{"id": 1, "name": "All", "slug": "all"}]
+        else:
+            _categories_cache = [{"id": 1, "name": "All", "slug": "all"}]
+    
+    return _products_cache, _categories_cache
+
+def _save_json_cache():
+    """Save data to JSON cache files"""
+    try:
+        # Save products
+        if _products_cache:
+            with open(PRODUCTS_FILE, 'w', encoding='utf-8') as f:
+                json.dump(_products_cache, f, indent=2, default=str)
+        
+        # Save categories
+        if _categories_cache:
+            with open(CATEGORIES_FILE, 'w', encoding='utf-8') as f:
+                json.dump(_categories_cache, f, indent=2, default=str)
+    except Exception as e:
+        print(f"Error saving JSON cache: {e}")
+
 # --- Categories ---
 
 def list_categories():
-    sb = supabase()
-    res = sb.table("menu_categories").select("id,name,created_at").order("name").execute()
-    return res.data or []
+    """Load categories from JSON cache first, then fallback to Supabase."""
+    # Try JSON cache first
+    products, categories = _load_json_cache()
+    if categories:
+        return categories
+    
+    # Fallback to Supabase
+    try:
+        sb = supabase()
+        res = sb.table("menu_categories").select("id,name,created_at").order("name").execute()
+        data = res.data or []
+        
+        # Update cache
+        global _categories_cache
+        _categories_cache = data
+        _categories_cache_time = datetime.now().timestamp()
+        
+        return data
+    except Exception as e:
+        print(f"Error loading categories from Supabase: {e}")
+        return [{"id": 1, "name": "All", "slug": "all"}]
 
 def create_category(name: str):
     name = (name or "").strip()
     if not name:
         raise ValueError("Category name is required")
-    sb = supabase()
-    # ignore unique violation by upsert
+    
+    # Update JSON cache first
+    products, categories = _load_json_cache()
+    new_id = max([c.get('id', 0) for c in categories] + [0]) + 1
+    new_category = {"id": new_id, "name": name, "slug": name.lower().replace(' ', '-')}
+    categories.append(new_category)
+    
+    # Save to cache
+    global _categories_cache
+    _categories_cache = categories
+    _categories_cache_time = datetime.now().timestamp()
+    _save_json_cache()
+    
+    # Also save to Supabase
     try:
-        sb.table("menu_categories").insert({"name": name}).execute()
-    except Exception:
-        # last resort: upsert style if supported
+        sb = supabase()
+        # ignore unique violation by upsert
         try:
-            sb.table("menu_categories").upsert({"name": name}).execute()
-        except Exception as e:
-            raise e
+            sb.table("menu_categories").insert({"name": name}).execute()
+        except Exception:
+            # last resort: upsert style if supported
+            try:
+                sb.table("menu_categories").upsert({"name": name}).execute()
+            except Exception as e:
+                print(f"Error saving category to Supabase: {e}")
+    except Exception as e:
+        print(f"Supabase not available for category creation: {e}")
 
 def update_category(category_id: int, name: str):
-    sb = supabase()
-    sb.table("menu_categories").update({"name": (name or "").strip()}).eq("id", int(category_id)).execute()
+    # Update JSON cache first
+    products, categories = _load_json_cache()
+    for cat in categories:
+        if cat.get('id') == category_id:
+            cat['name'] = (name or "").strip()
+            cat['slug'] = name.lower().replace(' ', '-')
+            break
+    
+    # Save to cache
+    global _categories_cache
+    _categories_cache = categories
+    _categories_cache_time = datetime.now().timestamp()
+    _save_json_cache()
+    
+    # Also update Supabase
+    try:
+        sb = supabase()
+        sb.table("menu_categories").update({"name": (name or "").strip()}).eq("id", int(category_id)).execute()
+    except Exception as e:
+        print(f"Error updating category in Supabase: {e}")
 
 def delete_category(category_id: int):
-    sb = supabase()
-    sb.table("menu_categories").delete().eq("id", int(category_id)).execute()
+    # Update JSON cache first
+    products, categories = _load_json_cache()
+    categories = [c for c in categories if c.get('id') != category_id]
+    
+    # Save to cache
+    global _categories_cache
+    _categories_cache = categories
+    _categories_cache_time = datetime.now().timestamp()
+    _save_json_cache()
+    
+    # Also delete from Supabase
+    try:
+        sb = supabase()
+        sb.table("menu_categories").delete().eq("id", int(category_id)).execute()
+    except Exception as e:
+        print(f"Error deleting category from Supabase: {e}")
 
 # --- Items ---
 
 def list_items():
-    sb = supabase()
+    """Load items from JSON cache first, then fallback to Supabase."""
+    # Try JSON cache first
+    products, categories = _load_json_cache()
+    if products:
+        return products
+    
+    # Fallback to Supabase
     try:
-        res = sb.table("menu_items").select("id,name,description,price,image_url,quantity,category_id,created_at").order("created_at", desc=True).execute()
-        return res.data or []
-    except Exception:
-        # Fallback for older schema without image_url
-        res = sb.table("menu_items").select("id,name,description,price,category_id,created_at").order("created_at", desc=True).execute()
-        return res.data or []
+        sb = supabase()
+        try:
+            res = sb.table("menu_items").select("id,name,description,price,image_url,quantity,category_id,created_at").order("created_at", desc=True).execute()
+            data = res.data or []
+        except Exception:
+            # Fallback for older schema without image_url
+            res = sb.table("menu_items").select("id,name,description,price,category_id,created_at").order("created_at", desc=True).execute()
+            data = res.data or []
+        
+        # Update cache
+        global _products_cache
+        _products_cache = data
+        _products_cache_time = datetime.now().timestamp()
+        
+        return data
+    except Exception as e:
+        print(f"Error loading items from Supabase: {e}")
+        return []
 
 
 def list_items_for_category(category_id: int):
-    sb = supabase()
+    """Load items for a specific category from JSON cache first, then fallback to Supabase."""
+    # Try JSON cache first
+    products, categories = _load_json_cache()
+    if products:
+        return [item for item in products if item.get('category_id') == category_id]
+    
+    # Fallback to Supabase
     try:
-        res = sb.table("menu_items").select("id,name,description,price,image_url,quantity,category_id,created_at").eq("category_id", category_id).order("name").execute()
-        return res.data or []
-    except Exception:
-        res = sb.table("menu_items").select("id,name,description,price,category_id,created_at").eq("category_id", category_id).order("name").execute()
-        return res.data or []
+        sb = supabase()
+        try:
+            res = sb.table("menu_items").select("id,name,description,price,image_url,quantity,category_id,created_at").eq("category_id", category_id).order("name").execute()
+            data = res.data or []
+        except Exception:
+            res = sb.table("menu_items").select("id,name,description,price,category_id,created_at").eq("category_id", category_id).order("name").execute()
+            data = res.data or []
+        
+        return data
+    except Exception as e:
+        print(f"Error loading items for category from Supabase: {e}")
+        return []
 
 
 def create_item(category_id: int, name: str, description: str | None, price: float | None, image_url: str | None = None, quantity: int | None = None):
     name = (name or "").strip()
     if not name:
         raise ValueError("Item name is required")
-    sb = supabase()
-    payload = {
+    
+    # Update JSON cache first
+    products, categories = _load_json_cache()
+    new_id = max([p.get('id', 0) for p in products] + [0]) + 1
+    new_item = {
+        "id": new_id,
         "category_id": int(category_id),
         "name": name,
         "description": (description or "").strip() or None,
         "price": float(price) if price not in (None, "") else None,
         "image_url": (image_url or "").strip() or None,
+        "quantity": int(quantity) if quantity not in (None, "") else 0,
+        "created_at": datetime.utcnow().isoformat()
     }
-    if quantity not in (None, ""):
-        try:
-            payload["quantity"] = int(quantity)
-        except Exception:
-            pass
-    sb.table("menu_items").insert(payload).execute()
+    products.append(new_item)
+    
+    # Save to cache
+    global _products_cache
+    _products_cache = products
+    _products_cache_time = datetime.now().timestamp()
+    _save_json_cache()
+    
+    # Also save to Supabase
+    try:
+        sb = supabase()
+        payload = {
+            "category_id": int(category_id),
+            "name": name,
+            "description": (description or "").strip() or None,
+            "price": float(price) if price not in (None, "") else None,
+            "image_url": (image_url or "").strip() or None,
+        }
+        if quantity not in (None, ""):
+            try:
+                payload["quantity"] = int(quantity)
+            except Exception:
+                pass
+        sb.table("menu_items").insert(payload).execute()
+    except Exception as e:
+        print(f"Error saving item to Supabase: {e}")
 
 
 def get_item(item_id: int):
-    sb = supabase()
+    """Get a single item from JSON cache first, then fallback to Supabase."""
+    # Try JSON cache first
+    products, categories = _load_json_cache()
+    for item in products:
+        if item.get('id') == item_id:
+            return item
+    
+    # Fallback to Supabase
     try:
-        res = sb.table("menu_items").select("id,name,description,price,image_url,quantity,category_id").eq("id", int(item_id)).limit(1).execute()
-    except Exception:
-        res = sb.table("menu_items").select("id,name,description,price,category_id").eq("id", int(item_id)).limit(1).execute()
-    if res.data:
-        return res.data[0]
+        sb = supabase()
+        try:
+            res = sb.table("menu_items").select("id,name,description,price,image_url,quantity,category_id").eq("id", int(item_id)).limit(1).execute()
+        except Exception:
+            res = sb.table("menu_items").select("id,name,description,price,category_id").eq("id", int(item_id)).limit(1).execute()
+        if res.data:
+            return res.data[0]
+    except Exception as e:
+        print(f"Error getting item from Supabase: {e}")
     return None
 
+
 def update_item(item_id: int, name: str, description: str | None, price: float | None, image_url: str | None, quantity: int | None = None):
-    sb = supabase()
-    payload = {
-        "name": (name or "").strip(),
-        "description": (description or "").strip() or None,
-        "price": float(price) if price not in (None, "") else None,
-        "image_url": (image_url or "").strip() or None,
-    }
-    if quantity not in (None, ""):
-        try:
-            payload["quantity"] = int(quantity)
-        except Exception:
-            pass
-    sb.table("menu_items").update(payload).eq("id", int(item_id)).execute()
+    # Update JSON cache first
+    products, categories = _load_json_cache()
+    for item in products:
+        if item.get('id') == item_id:
+            item['name'] = (name or "").strip()
+            item['description'] = (description or "").strip() or None
+            item['price'] = float(price) if price not in (None, "") else None
+            item['image_url'] = (image_url or "").strip() or None
+            if quantity is not None:
+                item['quantity'] = int(quantity) if quantity else 0
+            break
+    
+    # Save to cache
+    global _products_cache
+    _products_cache = products
+    _products_cache_time = datetime.now().timestamp()
+    _save_json_cache()
+    
+    # Also update Supabase
+    try:
+        sb = supabase()
+        payload = {
+            "name": (name or "").strip(),
+            "description": (description or "").strip() or None,
+            "price": float(price) if price not in (None, "") else None,
+            "image_url": (image_url or "").strip() or None,
+        }
+        if quantity not in (None, ""):
+            try:
+                payload["quantity"] = int(quantity)
+            except Exception:
+                pass
+        sb.table("menu_items").update(payload).eq("id", int(item_id)).execute()
+    except Exception as e:
+        print(f"Error updating item in Supabase: {e}")
+
 
 def delete_item(item_id: int):
-    sb = supabase()
-    sb.table("menu_items").delete().eq("id", int(item_id)).execute()
+    # Update JSON cache first
+    products, categories = _load_json_cache()
+    products = [p for p in products if p.get('id') != item_id]
+    
+    # Save to cache
+    global _products_cache
+    _products_cache = products
+    _products_cache_time = datetime.now().timestamp()
+    _save_json_cache()
+    
+    # Also delete from Supabase
+    try:
+        sb = supabase()
+        sb.table("menu_items").delete().eq("id", int(item_id)).execute()
+    except Exception as e:
+        print(f"Error deleting item from Supabase: {e}")
 
 # --- Inventory helpers ---
 
@@ -130,17 +361,18 @@ def set_item_quantity(item_id: int, quantity: int):
     sb = supabase()
     try:
         sb.table("menu_items").update({"quantity": int(quantity)}).eq("id", int(item_id)).execute()
-    except Exception:
-        # Column may not exist; ignore
-        pass
+    except Exception as e:
+        print(f"Error updating quantity in Supabase: {e}")
 
 def change_item_quantity(item_id: int, delta: int):
-    itm = get_item(item_id) or {}
+    sb = supabase()
     try:
-        current = int(itm.get("quantity", 0))
-    except Exception:
-        current = 0
-    set_item_quantity(item_id, max(0, current + int(delta)))
+        res = sb.table("menu_items").select("quantity").eq("id", int(item_id)).limit(1).execute()
+        if res.data:
+            current = int(res.data[0].get("quantity", 0))
+            sb.table("menu_items").update({"quantity": max(0, current + int(delta))}).eq("id", int(item_id)).execute()
+    except Exception as e:
+        print(f"Error updating quantity in Supabase: {e}")
 
 # --- Site settings (optional, mirrored) ---
 
