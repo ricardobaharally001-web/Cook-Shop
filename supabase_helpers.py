@@ -48,17 +48,17 @@ def create_category(name: str):
 
 def list_items():
     sb = supabase()
-    res = sb.table("menu_items").select("id,name,description,price,category_id,created_at").order("created_at", desc=True).execute()
+    res = sb.table("menu_items").select("id,name,description,price,image_url,category_id,created_at").order("created_at", desc=True).execute()
     return res.data or []
 
 
 def list_items_for_category(category_id: int):
     sb = supabase()
-    res = sb.table("menu_items").select("id,name,description,price,category_id,created_at").eq("category_id", category_id).order("name").execute()
+    res = sb.table("menu_items").select("id,name,description,price,image_url,category_id,created_at").eq("category_id", category_id).order("name").execute()
     return res.data or []
 
 
-def create_item(category_id: int, name: str, description: str | None, price: float | None):
+def create_item(category_id: int, name: str, description: str | None, price: float | None, image_url: str | None = None):
     name = (name or "").strip()
     if not name:
         raise ValueError("Item name is required")
@@ -68,8 +68,17 @@ def create_item(category_id: int, name: str, description: str | None, price: flo
         "name": name,
         "description": (description or "").strip() or None,
         "price": float(price) if price not in (None, "") else None,
+        "image_url": (image_url or "").strip() or None,
     }
     sb.table("menu_items").insert(payload).execute()
+
+
+def get_item(item_id: int):
+    sb = supabase()
+    res = sb.table("menu_items").select("id,name,description,price,image_url,category_id").eq("id", int(item_id)).limit(1).execute()
+    if res.data:
+        return res.data[0]
+    return None
 
 # --- Site settings (optional, mirrored) ---
 
@@ -142,4 +151,30 @@ def upload_logo_to_supabase(file_storage) -> str:
             except Exception as e_c:
                 last_err = e_c
                 raise RuntimeError(f"Supabase upload failed: {last_err}")
+    return _public_url(SUPABASE_ASSETS_BUCKET, key)
+
+
+def upload_item_image(file_storage) -> str:
+    """Upload an item image to the assets bucket and return public URL."""
+    filename = file_storage.filename or "item.png"
+    stamp = datetime.utcnow().strftime("%Y%m%d-%H%M%S")
+    ext = (filename.rsplit(".", 1)[-1] if "." in filename else "png").lower()
+    key = f"items/item_{stamp}.{ext}"
+    data = file_storage.read()
+    file_storage.seek(0)
+    client = supabase()
+    mime = "image/svg+xml" if ext == "svg" else f"image/{ext}"
+    try:
+        client.storage.from_(SUPABASE_ASSETS_BUCKET).upload(
+            path=key,
+            file=data,
+            file_options={"contentType": mime, "cacheControl": "3600", "upsert": True},
+        )
+    except Exception:
+        client.storage.from_(SUPABASE_ASSETS_BUCKET).upload(
+            path=key,
+            file=io.BytesIO(data),
+            file_options={"contentType": mime, "cacheControl": "3600"},
+            upsert=True,
+        )
     return _public_url(SUPABASE_ASSETS_BUCKET, key)
