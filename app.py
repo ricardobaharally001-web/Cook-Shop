@@ -13,6 +13,11 @@ from supabase_helpers import (
     upload_logo_to_supabase,
     upload_item_image,
     get_item,
+    update_category,
+    delete_category,
+    update_item,
+    delete_item,
+    change_item_quantity,
 )
 
 load_dotenv()
@@ -127,31 +132,74 @@ def admin_settings():
             else:
                 flash("Invalid WhatsApp number format. Use + and digits only.", "danger")
         return redirect(url_for("admin_settings"))
-    site = _site()
-    return render_template("admin_settings.html", site=site)
 
 
-# ---------- Branding (Logo Upload) ----------
+# ---------- Template Context ----------
 
-@app.route("/admin/branding", methods=["GET", "POST"]) 
-def admin_branding():
+@app.context_processor
+def inject_nav_counts():
+    cart = _cart()
+    count = sum(int(q) for q in cart.values())
+    return {"cart_count": count}
+
+
+# ---------- Admin: Edit/Delete ----------
+
+@app.post("/admin/categories/update")
+def admin_category_update():
     if not is_logged_in():
         return redirect(url_for("admin_login"))
-    site = _site()
-    if request.method == "POST":
-        file = request.files.get("logo")
-        if not file or not file.filename.strip():
-            flash("Please choose an image file.", "danger")
-            return redirect(url_for("admin_branding"))
-        try:
-            url = upload_logo_to_supabase(file)
-            set_site_setting("logo_url", url)
-            flash("Logo updated!", "success")
-            site["logo_url"] = url
-        except Exception as e:
-            flash(f"Upload failed: {e}", "danger")
-        return redirect(url_for("admin_branding"))
-    return render_template("admin_branding.html", site=site, current_logo=site.get("logo_url"))
+    cid = request.form.get("id")
+    name = request.form.get("name")
+    try:
+        update_category(cid, name)
+        flash("Category updated", "success")
+    except Exception as e:
+        flash(f"Update failed: {e}", "danger")
+    return redirect(url_for("admin_categories"))
+
+
+@app.post("/admin/categories/delete")
+def admin_category_delete():
+    if not is_logged_in():
+        return redirect(url_for("admin_login"))
+    cid = request.form.get("id")
+    try:
+        delete_category(cid)
+        flash("Category deleted", "info")
+    except Exception as e:
+        flash(f"Delete failed: {e}", "danger")
+    return redirect(url_for("admin_categories"))
+
+
+@app.post("/admin/items/update")
+def admin_item_update():
+    if not is_logged_in():
+        return redirect(url_for("admin_login"))
+    iid = request.form.get("id")
+    name = request.form.get("name")
+    description = request.form.get("description")
+    price = request.form.get("price")
+    image_url = request.form.get("image_url")
+    try:
+        update_item(iid, name, description, price, image_url)
+        flash("Item updated", "success")
+    except Exception as e:
+        flash(f"Update failed: {e}", "danger")
+    return redirect(url_for("admin_items"))
+
+
+@app.post("/admin/items/delete")
+def admin_item_delete():
+    if not is_logged_in():
+        return redirect(url_for("admin_login"))
+    iid = request.form.get("id")
+    try:
+        delete_item(iid)
+        flash("Item deleted", "info")
+    except Exception as e:
+        flash(f"Delete failed: {e}", "danger")
+    return redirect(url_for("admin_items"))
 
 
 # ---------- Categories ----------
@@ -184,6 +232,7 @@ def admin_items():
         name = request.form.get("name")
         description = request.form.get("description")
         price = request.form.get("price")
+        quantity = request.form.get("quantity")
         image_url = None
         file = request.files.get("image")
         if file and file.filename.strip():
@@ -192,7 +241,7 @@ def admin_items():
             except Exception as e:
                 flash(f"Image upload failed: {e}", "warning")
         try:
-            create_item(category_id, name, description, price, image_url)
+            create_item(category_id, name, description, price, image_url, quantity)
             flash("Item saved", "success")
         except Exception as e:
             flash(f"Error: {e}", "danger")
@@ -222,9 +271,25 @@ def cart_view():
 @app.route("/cart/add", methods=["POST"]) 
 def cart_add():
     item_id = int(request.form.get("item_id"))
-    qty = int(request.form.get("qty", 1))
+    req_qty = max(1, int(request.form.get("qty", 1)))
+    itm = get_item(item_id)
+    available = None
+    try:
+        available = int((itm or {}).get("quantity"))
+    except Exception:
+        available = None
     cart = _cart()
-    cart[str(item_id)] = cart.get(str(item_id), 0) + max(1, qty)
+    current_in_cart = int(cart.get(str(item_id), 0))
+    if available is not None:
+        # Cap added quantity so total in cart does not exceed available
+        can_add = max(0, available - current_in_cart)
+        add_qty = min(req_qty, can_add)
+    else:
+        add_qty = req_qty
+    if add_qty <= 0:
+        flash("Not enough stock", "warning")
+        return redirect(request.referrer or url_for("index"))
+    cart[str(item_id)] = current_in_cart + add_qty
     _save_cart(cart)
     flash("Added to cart", "success")
     return redirect(request.referrer or url_for("index"))
@@ -263,6 +328,12 @@ def cart_checkout():
         line_total = price * int(qty)
         subtotal += line_total
         lines.append(f"{itm['name']} x{qty} - ${line_total:.2f}")
+    # Decrement inventory after building message
+    for item_id, qty in cart.items():
+        try:
+            change_item_quantity(item_id, -int(qty))
+        except Exception:
+            pass
     lines.append("--------------------------------")
     lines.append(f"Subtotal: ${subtotal:.2f}")
     message = "\n".join(lines)

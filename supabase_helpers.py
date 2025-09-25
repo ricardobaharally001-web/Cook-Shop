@@ -44,12 +44,20 @@ def create_category(name: str):
         except Exception as e:
             raise e
 
+def update_category(category_id: int, name: str):
+    sb = supabase()
+    sb.table("menu_categories").update({"name": (name or "").strip()}).eq("id", int(category_id)).execute()
+
+def delete_category(category_id: int):
+    sb = supabase()
+    sb.table("menu_categories").delete().eq("id", int(category_id)).execute()
+
 # --- Items ---
 
 def list_items():
     sb = supabase()
     try:
-        res = sb.table("menu_items").select("id,name,description,price,image_url,category_id,created_at").order("created_at", desc=True).execute()
+        res = sb.table("menu_items").select("id,name,description,price,image_url,quantity,category_id,created_at").order("created_at", desc=True).execute()
         return res.data or []
     except Exception:
         # Fallback for older schema without image_url
@@ -60,14 +68,14 @@ def list_items():
 def list_items_for_category(category_id: int):
     sb = supabase()
     try:
-        res = sb.table("menu_items").select("id,name,description,price,image_url,category_id,created_at").eq("category_id", category_id).order("name").execute()
+        res = sb.table("menu_items").select("id,name,description,price,image_url,quantity,category_id,created_at").eq("category_id", category_id).order("name").execute()
         return res.data or []
     except Exception:
         res = sb.table("menu_items").select("id,name,description,price,category_id,created_at").eq("category_id", category_id).order("name").execute()
         return res.data or []
 
 
-def create_item(category_id: int, name: str, description: str | None, price: float | None, image_url: str | None = None):
+def create_item(category_id: int, name: str, description: str | None, price: float | None, image_url: str | None = None, quantity: int | None = None):
     name = (name or "").strip()
     if not name:
         raise ValueError("Item name is required")
@@ -79,15 +87,60 @@ def create_item(category_id: int, name: str, description: str | None, price: flo
         "price": float(price) if price not in (None, "") else None,
         "image_url": (image_url or "").strip() or None,
     }
+    if quantity not in (None, ""):
+        try:
+            payload["quantity"] = int(quantity)
+        except Exception:
+            pass
     sb.table("menu_items").insert(payload).execute()
 
 
 def get_item(item_id: int):
     sb = supabase()
-    res = sb.table("menu_items").select("id,name,description,price,image_url,category_id").eq("id", int(item_id)).limit(1).execute()
+    try:
+        res = sb.table("menu_items").select("id,name,description,price,image_url,quantity,category_id").eq("id", int(item_id)).limit(1).execute()
+    except Exception:
+        res = sb.table("menu_items").select("id,name,description,price,category_id").eq("id", int(item_id)).limit(1).execute()
     if res.data:
         return res.data[0]
     return None
+
+def update_item(item_id: int, name: str, description: str | None, price: float | None, image_url: str | None, quantity: int | None = None):
+    sb = supabase()
+    payload = {
+        "name": (name or "").strip(),
+        "description": (description or "").strip() or None,
+        "price": float(price) if price not in (None, "") else None,
+        "image_url": (image_url or "").strip() or None,
+    }
+    if quantity not in (None, ""):
+        try:
+            payload["quantity"] = int(quantity)
+        except Exception:
+            pass
+    sb.table("menu_items").update(payload).eq("id", int(item_id)).execute()
+
+def delete_item(item_id: int):
+    sb = supabase()
+    sb.table("menu_items").delete().eq("id", int(item_id)).execute()
+
+# --- Inventory helpers ---
+
+def set_item_quantity(item_id: int, quantity: int):
+    sb = supabase()
+    try:
+        sb.table("menu_items").update({"quantity": int(quantity)}).eq("id", int(item_id)).execute()
+    except Exception:
+        # Column may not exist; ignore
+        pass
+
+def change_item_quantity(item_id: int, delta: int):
+    itm = get_item(item_id) or {}
+    try:
+        current = int(itm.get("quantity", 0))
+    except Exception:
+        current = 0
+    set_item_quantity(item_id, max(0, current + int(delta)))
 
 # --- Site settings (optional, mirrored) ---
 
