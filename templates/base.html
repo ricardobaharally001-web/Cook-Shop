@@ -12,7 +12,7 @@
       <div class="container">
         <a class="navbar-brand d-flex align-items-center" href="/">
           {% if site and site.logo_url %}
-          <img src="{{ site.logo_url }}" alt="logo" height="28" class="me-2">
+          <img src="{{ site.logo_url }}" alt="logo" class="logo-avatar me-2">
           {% endif %}
           <span>{{ site.brand_name if site and site.brand_name else 'Restaurant Menu' }}</span>
         </a>
@@ -22,7 +22,12 @@
         <div class="collapse navbar-collapse" id="navMain">
           <ul class="navbar-nav ms-auto mb-2 mb-lg-0 align-items-lg-center">
             <li class="nav-item me-2">
-              <a class="btn btn-outline-light btn-sm" href="/cart">Cart</a>
+              <a id="cartBtn" class="btn btn-outline-light btn-sm d-flex align-items-center gap-2" href="/cart">
+                <span>Cart</span>
+                {% if cart_count and cart_count>0 %}
+                  <span class="cart-badge">{{ cart_count }}</span>
+                {% endif %}
+              </a>
             </li>
             <li class="nav-item me-2">
               <a class="btn btn-outline-light btn-sm" href="/toggle-dark">{% if site and site.dark_mode %}Light Mode{% else %}Dark Mode{% endif %}</a>

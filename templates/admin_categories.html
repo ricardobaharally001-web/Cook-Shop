@@ -23,8 +23,22 @@
       {% if categories %}
       <ul class="list-group">
         {% for c in categories %}
-          <li class="list-group-item d-flex justify-content-between align-items-center">
-            <span>{{ c.name }}</span>
+          <li class="list-group-item">
+            <div class="row g-2 align-items-center">
+              <div class="col-md-5">
+                <form class="d-flex gap-2" method="post" action="/admin/categories/update">
+                  <input type="hidden" name="id" value="{{ c.id }}">
+                  <input type="text" class="form-control" name="name" value="{{ c.name }}" required>
+                  <button class="btn btn-sm btn-outline-primary">Update</button>
+                </form>
+              </div>
+              <div class="col-auto ms-auto">
+                <form method="post" action="/admin/categories/delete" onsubmit="return confirm('Delete this category? Items in it will also be removed.');">
+                  <input type="hidden" name="id" value="{{ c.id }}">
+                  <button class="btn btn-sm btn-outline-danger">Delete</button>
+                </form>
+              </div>
+            </div>
           </li>
         {% endfor %}
       </ul>
