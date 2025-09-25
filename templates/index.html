@@ -28,6 +28,13 @@
                     </div>
                     {% if item.description %}<div class="small text-muted">{{ item.description }}</div>{% endif %}
                     <div class="small mt-1">In stock: {{ item.quantity if item.quantity is not none else 0 }}</div>
+                    <div class="d-flex gap-2 mt-2">
+                      <a class="btn btn-sm btn-outline-primary" href="/admin/items/edit/{{ item.id }}">Edit</a>
+                      <form method="post" action="/admin/items/delete" onsubmit="return confirm('Delete this item?');" style="display: inline;">
+                        <input type="hidden" name="id" value="{{ item.id }}">
+                        <button class="btn btn-sm btn-outline-danger">Delete</button>
+                      </form>
+                    </div>
                     <form class="mt-2 d-flex align-items-center gap-2" method="post" action="/cart/add">
                       <input type="hidden" name="item_id" value="{{ item.id }}">
                       {% set stock = item.quantity if item.quantity is not none else 0 %}
