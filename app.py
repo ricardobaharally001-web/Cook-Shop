@@ -320,6 +320,7 @@ def cart_remove():
         flash("Removed item", "info")
     return redirect(url_for("cart_view"))
 
+@app.route("/cart/checkout", methods=["POST"])
 def cart_checkout():
     cart = _cart()
     if not cart:
