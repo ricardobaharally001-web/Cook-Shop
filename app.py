@@ -208,6 +208,12 @@ def admin_item_edit(item_id):
         price = request.form.get("price")
         quantity = request.form.get("quantity")
         image_url = request.form.get("image_url")
+        file = request.files.get("image")
+        if file and file.filename.strip():
+            try:
+                image_url = upload_item_image(file)
+            except Exception as e:
+                flash(f"Image upload failed: {e}", "warning")
         try:
             update_item(item_id, name, description, price, image_url, quantity)
             flash("Item updated", "success")
