@@ -157,11 +157,10 @@ def _save_json_cache():
 # --- Categories ---
 
 def list_categories():
-    """Load categories from JSON cache first, then fallback to Supabase."""
-    # Try JSON cache first
-    products, categories = _load_json_cache()
-    if categories:
-        return categories
+    """Load categories from in-memory cache first, then fallback to Supabase."""
+    # Try in-memory cache first
+    if _categories_cache:
+        return _categories_cache
     
     # Fallback to Supabase
     try:
@@ -184,15 +183,17 @@ def create_category(name: str):
     if not name:
         raise ValueError("Category name is required")
     
-    # Update JSON cache first
-    products, categories = _load_json_cache()
-    new_id = max([c.get('id', 0) for c in categories] + [0]) + 1
-    new_category = {"id": new_id, "name": name, "slug": name.lower().replace(' ', '-')}
-    categories.append(new_category)
+    # Update in-memory cache directly (more reliable than loading from JSON)
+    if _categories_cache:
+        new_id = max([c.get('id', 0) for c in _categories_cache] + [0]) + 1
+        new_category = {"id": new_id, "name": name, "slug": name.lower().replace(' ', '-')}
+        _categories_cache.append(new_category)
+    else:
+        new_id = 1
+        new_category = {"id": new_id, "name": name, "slug": name.lower().replace(' ', '-')}
+        _categories_cache = [new_category]
     
     # Save to cache
-    global _categories_cache
-    _categories_cache = categories
     _categories_cache_time = datetime.now().timestamp()
     _save_json_cache()
     
@@ -210,19 +211,19 @@ def create_category(name: str):
                 print(f"Error saving category to Supabase: {e}")
     except Exception as e:
         print(f"Supabase not available for category creation: {e}")
+    
+    return new_category
 
 def update_category(category_id: int, name: str):
-    # Update JSON cache first
-    products, categories = _load_json_cache()
-    for cat in categories:
-        if cat.get('id') == category_id:
-            cat['name'] = (name or "").strip()
-            cat['slug'] = name.lower().replace(' ', '-')
-            break
+    # Update in-memory cache directly (more reliable than loading from JSON)
+    if _categories_cache:
+        for cat in _categories_cache:
+            if cat.get('id') == category_id:
+                cat['name'] = (name or "").strip()
+                cat['slug'] = name.lower().replace(' ', '-')
+                break
     
     # Save to cache
-    global _categories_cache
-    _categories_cache = categories
     _categories_cache_time = datetime.now().timestamp()
     _save_json_cache()
     
@@ -232,15 +233,15 @@ def update_category(category_id: int, name: str):
         sb.table("menu_categories").update({"name": (name or "").strip()}).eq("id", int(category_id)).execute()
     except Exception as e:
         print(f"Error updating category in Supabase: {e}")
+    
+    return True
 
 def delete_category(category_id: int):
-    # Update JSON cache first
-    products, categories = _load_json_cache()
-    categories = [c for c in categories if c.get('id') != category_id]
+    # Update in-memory cache directly (more reliable than loading from JSON)
+    if _categories_cache:
+        _categories_cache = [c for c in _categories_cache if c.get('id') != category_id]
     
     # Save to cache
-    global _categories_cache
-    _categories_cache = categories
     _categories_cache_time = datetime.now().timestamp()
     _save_json_cache()
     
@@ -250,15 +251,16 @@ def delete_category(category_id: int):
         sb.table("menu_categories").delete().eq("id", int(category_id)).execute()
     except Exception as e:
         print(f"Error deleting category from Supabase: {e}")
+    
+    return True
 
 # --- Items ---
 
 def list_items():
-    """Load items from JSON cache first, then fallback to Supabase."""
-    # Try JSON cache first
-    products, categories = _load_json_cache()
-    if products:
-        return products
+    """Load items from in-memory cache first, then fallback to Supabase."""
+    # Try in-memory cache first
+    if _products_cache:
+        return _products_cache
     
     # Fallback to Supabase
     try:
@@ -283,11 +285,10 @@ def list_items():
 
 
 def list_items_for_category(category_id: int):
-    """Load items for a specific category from JSON cache first, then fallback to Supabase."""
-    # Try JSON cache first
-    products, categories = _load_json_cache()
-    if products:
-        return [item for item in products if item.get('category_id') == category_id]
+    """Load items for a specific category from in-memory cache first, then fallback to Supabase."""
+    # Try in-memory cache first
+    if _products_cache:
+        return [item for item in _products_cache if item.get('category_id') == category_id]
     
     # Fallback to Supabase
     try:
@@ -358,26 +359,28 @@ def create_item(category_id: int, name: str, description: str | None, price: flo
             "created_at": datetime.utcnow().isoformat()
         }
     
-    # Update JSON cache
-    products, categories = _load_json_cache()
-    products.append(new_item)
+    # Update in-memory cache directly (more reliable than loading from JSON)
+    if _products_cache:
+        _products_cache.append(new_item)
+    else:
+        _products_cache = [new_item]
     
-    # Save to cache
-    global _products_cache
-    _products_cache = products
-    _products_cache_time = datetime.now().timestamp()
+    # Also update JSON cache for persistence
     _save_json_cache()
+    
+    # Update timestamp
+    _products_cache_time = datetime.now().timestamp()
     
     return new_item
 
 
 def get_item(item_id: int):
-    """Get a single item from JSON cache first, then fallback to Supabase."""
-    # Try JSON cache first
-    products, categories = _load_json_cache()
-    for item in products:
-        if item.get('id') == item_id:
-            return item
+    """Get a single item from in-memory cache first, then fallback to Supabase."""
+    # Try in-memory cache first
+    if _products_cache:
+        for item in _products_cache:
+            if item.get('id') == item_id:
+                return item
     
     # Fallback to Supabase
     try:
@@ -413,24 +416,24 @@ def update_item(item_id: int, name: str, description: str | None, price: float |
     except Exception as e:
         print(f"Error updating item in Supabase: {e}")
     
-    # Update JSON cache
-    products, categories = _load_json_cache()
-    for item in products:
-        if item.get('id') == item_id:
-            item['name'] = (name or "").strip()
-            item['description'] = (description or "").strip() or None
-            item['price'] = float(price) if price not in (None, "") else None
-            item['image_url'] = (image_url or "").strip() or None
-            if quantity is not None:
-                item['quantity'] = int(quantity) if quantity else 0
-            break
+    # Update in-memory cache directly (more reliable than loading from JSON)
+    if _products_cache:
+        for item in _products_cache:
+            if item.get('id') == item_id:
+                item['name'] = (name or "").strip()
+                item['description'] = (description or "").strip() or None
+                item['price'] = float(price) if price not in (None, "") else None
+                item['image_url'] = (image_url or "").strip() or None
+                if quantity is not None:
+                    item['quantity'] = int(quantity) if quantity else 0
+                break
     
-    # Save to cache
-    global _products_cache
-    _products_cache = products
-    _products_cache_time = datetime.now().timestamp()
+    # Also update JSON cache for persistence
     _save_json_cache()
-
+    
+    # Update timestamp
+    _products_cache_time = datetime.now().timestamp()
+    
     return True
 
 
@@ -442,15 +445,15 @@ def delete_item(item_id: int):
     except Exception as e:
         print(f"Error deleting item from Supabase: {e}")
     
-    # Update JSON cache
-    products, categories = _load_json_cache()
-    products = [p for p in products if p.get('id') != item_id]
+    # Update in-memory cache directly (more reliable than loading from JSON)
+    if _products_cache:
+        _products_cache = [p for p in _products_cache if p.get('id') != item_id]
     
-    # Save to cache
-    global _products_cache
-    _products_cache = products
-    _products_cache_time = datetime.now().timestamp()
+    # Also update JSON cache for persistence
     _save_json_cache()
+    
+    # Update timestamp
+    _products_cache_time = datetime.now().timestamp()
     
     return True
 
@@ -474,18 +477,18 @@ def set_item_quantity(item_id: int, quantity: int):
             print(f"Error updating quantity in Supabase: {e}")
             return False
         
-        # Update JSON cache
-        products, categories = _load_json_cache()
-        for item in products:
-            if item.get('id') == item_id:
-                item['quantity'] = int(quantity)
-                break
+        # Update in-memory cache directly (more reliable than loading from JSON)
+        if _products_cache:
+            for item in _products_cache:
+                if item.get('id') == item_id:
+                    item['quantity'] = int(quantity)
+                    break
         
-        # Save to cache
-        global _products_cache
-        _products_cache = products
-        _products_cache_time = datetime.now().timestamp()
+        # Also update JSON cache for persistence
         _save_json_cache()
+        
+        # Update timestamp
+        _products_cache_time = datetime.now().timestamp()
         
         if IS_PRODUCTION:
             print(f"✓ Set quantity for item {item_id} to {quantity}")
@@ -530,18 +533,18 @@ def change_item_quantity(item_id: int, delta: int):
             print(f"Error updating quantity in Supabase: {e}")
             return False
         
-        # Update JSON cache
-        products, categories = _load_json_cache()
-        for item in products:
-            if item.get('id') == item_id:
-                item['quantity'] = new_quantity
-                break
+        # Update in-memory cache directly (more reliable than loading from JSON)
+        if _products_cache:
+            for item in _products_cache:
+                if item.get('id') == item_id:
+                    item['quantity'] = new_quantity
+                    break
         
-        # Save to cache
-        global _products_cache
-        _products_cache = products
-        _products_cache_time = datetime.now().timestamp()
+        # Also update JSON cache for persistence
         _save_json_cache()
+        
+        # Update timestamp
+        _products_cache_time = datetime.now().timestamp()
         
         if IS_PRODUCTION:
             print(f"✓ Updated quantity for item {item_id}: {current_quantity} → {new_quantity} (delta: {delta})")
