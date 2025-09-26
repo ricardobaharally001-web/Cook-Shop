@@ -18,12 +18,20 @@ from supabase_helpers import (
     update_item,
     delete_item,
     change_item_quantity,
+    initialize_cache_from_supabase,
 )
 
 load_dotenv()
 
 app = Flask(__name__, static_folder="static", template_folder="templates")
 app.secret_key = os.environ.get("SECRET_KEY", "dev")
+
+# Initialize cache from Supabase on startup
+try:
+    initialize_cache_from_supabase()
+except Exception as e:
+    print(f"Warning: Could not initialize cache from Supabase: {e}")
+    print("App will use local JSON files as fallback")
 
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "admin")
 
