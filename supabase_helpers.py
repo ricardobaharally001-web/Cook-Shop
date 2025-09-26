@@ -687,6 +687,44 @@ def initialize_cache_from_supabase():
         # Load categories from Supabase
         res = sb.table("menu_categories").select("id,name,created_at").order("name").execute()
         supabase_categories = res.data or []
+        if not supabase_categories:
+            # Ensure at least one category exists
+            supabase_categories = [{"id": 1, "name": "All", "slug": "all"}]
+        
+        # Save to JSON files
+        _save_json_cache()
+        
+        if IS_PRODUCTION:
+            print(f"✓ Cache initialized from Supabase: {len(supabase_products)} products, {len(supabase_categories)} categories")
+        return True
+        
+    except Exception as e:
+        if IS_PRODUCTION:
+            print(f"Error initializing cache from Supabase: {e}")
+        return False
+
+
+def refresh_cache_from_supabase():
+    """
+    Manually refresh the JSON cache from Supabase data.
+    Useful for debugging or forcing a cache refresh.
+    """
+    global _products_cache, _products_cache_time, _categories_cache, _categories_cache_time
+    
+    try:
+        sb = supabase()
+        
+        # Load products from Supabase
+        try:
+            res = sb.table("menu_items").select("id,name,description,price,image_url,quantity,category_id,created_at").order("created_at", desc=True).execute()
+            supabase_products = res.data or []
+        except Exception:
+            res = sb.table("menu_items").select("id,name,description,price,category_id,created_at").order("created_at", desc=True).execute()
+            supabase_products = res.data or []
+        
+        # Load categories from Supabase
+        res = sb.table("menu_categories").select("id,name,created_at").order("name").execute()
+        supabase_categories = res.data or []
         
         if not supabase_categories:
             # Ensure at least one category exists
@@ -702,10 +740,10 @@ def initialize_cache_from_supabase():
         _save_json_cache()
         
         if IS_PRODUCTION:
-            print(f"✓ Cache initialized from Supabase: {len(supabase_products)} products, {len(supabase_categories)} categories")
+            print(f"✓ Cache refreshed from Supabase: {len(supabase_products)} products, {len(supabase_categories)} categories")
         return True
         
     except Exception as e:
         if IS_PRODUCTION:
-            print(f"Error initializing cache from Supabase: {e}")
+            print(f"Error refreshing cache from Supabase: {e}")
         return False
