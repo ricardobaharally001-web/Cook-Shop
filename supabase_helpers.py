@@ -457,57 +457,100 @@ def delete_item(item_id: int):
 # --- Inventory helpers ---
 
 def set_item_quantity(item_id: int, quantity: int):
-    # Update Supabase first (primary data store)
+    """
+    Set item quantity to a specific value.
+    Updates both Supabase and JSON cache.
+    """
     try:
         sb = supabase()
-        sb.table("menu_items").update({"quantity": int(quantity)}).eq("id", int(item_id)).execute()
+        
+        # Update Supabase first (primary data store)
+        try:
+            update_res = sb.table("menu_items").update({"quantity": int(quantity)}).eq("id", int(item_id)).execute()
+            if not update_res.data:
+                print(f"Warning: Failed to set quantity in Supabase for item {item_id}")
+                return False
+        except Exception as e:
+            print(f"Error updating quantity in Supabase: {e}")
+            return False
+        
+        # Update JSON cache
+        products, categories = _load_json_cache()
+        for item in products:
+            if item.get('id') == item_id:
+                item['quantity'] = int(quantity)
+                break
+        
+        # Save to cache
+        global _products_cache
+        _products_cache = products
+        _products_cache_time = datetime.now().timestamp()
+        _save_json_cache()
+        
+        if IS_PRODUCTION:
+            print(f"✓ Set quantity for item {item_id} to {quantity}")
+        
+        return True
+        
     except Exception as e:
-        print(f"Error updating quantity in Supabase: {e}")
-    
-    # Update JSON cache
-    products, categories = _load_json_cache()
-    for item in products:
-        if item.get('id') == item_id:
-            item['quantity'] = int(quantity)
-            break
-    
-    # Save to cache
-    global _products_cache
-    _products_cache = products
-    _products_cache_time = datetime.now().timestamp()
-    _save_json_cache()
+        print(f"Error in set_item_quantity: {e}")
+        return False
 
 
 def change_item_quantity(item_id: int, delta: int):
-    # Get current quantity from cache or Supabase
-    products, categories = _load_json_cache()
-    current_quantity = 0
-    
-    for item in products:
-        if item.get('id') == item_id:
-            current_quantity = item.get('quantity', 0)
-            break
-    
-    new_quantity = max(0, current_quantity + int(delta))
-    
-    # Update Supabase first
+    """
+    Change item quantity by delta amount.
+    Always gets current quantity from Supabase to ensure accuracy.
+    """
     try:
         sb = supabase()
-        sb.table("menu_items").update({"quantity": new_quantity}).eq("id", int(item_id)).execute()
+        
+        # First, get the current quantity directly from Supabase
+        try:
+            res = sb.table("menu_items").select("quantity").eq("id", int(item_id)).limit(1).execute()
+            if res.data and len(res.data) > 0:
+                current_quantity = int(res.data[0].get("quantity", 0))
+            else:
+                print(f"Warning: Item {item_id} not found in Supabase")
+                return False
+        except Exception as e:
+            print(f"Error getting current quantity from Supabase: {e}")
+            return False
+        
+        # Calculate new quantity
+        new_quantity = max(0, current_quantity + int(delta))
+        
+        # Update Supabase with the new quantity
+        try:
+            update_res = sb.table("menu_items").update({"quantity": new_quantity}).eq("id", int(item_id)).execute()
+            if not update_res.data:
+                print(f"Warning: Failed to update quantity in Supabase for item {item_id}")
+                return False
+        except Exception as e:
+            print(f"Error updating quantity in Supabase: {e}")
+            return False
+        
+        # Update JSON cache
+        products, categories = _load_json_cache()
+        for item in products:
+            if item.get('id') == item_id:
+                item['quantity'] = new_quantity
+                break
+        
+        # Save to cache
+        global _products_cache
+        _products_cache = products
+        _products_cache_time = datetime.now().timestamp()
+        _save_json_cache()
+        
+        if IS_PRODUCTION:
+            print(f"✓ Updated quantity for item {item_id}: {current_quantity} → {new_quantity} (delta: {delta})")
+        
+        return True
+        
     except Exception as e:
-        print(f"Error updating quantity in Supabase: {e}")
-    
-    # Update JSON cache
-    for item in products:
-        if item.get('id') == item_id:
-            item['quantity'] = new_quantity
-            break
-    
-    # Save to cache
-    global _products_cache
-    _products_cache = products
-    _products_cache_time = datetime.now().timestamp()
-    _save_json_cache()
+        print(f"Error in change_item_quantity: {e}")
+        return False
 
 
 # --- Site settings (optional, mirrored) ---
@@ -624,7 +667,10 @@ def upload_item_image(file_storage) -> str:
 # --- Cache initialization ---
 
 def initialize_cache_from_supabase():
-    """Initialize JSON cache from Supabase data (call this on app startup)"""
+    """
+    Initialize JSON cache from Supabase data (call this on app startup).
+    Same as refresh_cache_from_supabase but with different logging.
+    """
     global _products_cache, _products_cache_time, _categories_cache, _categories_cache_time
     
     try:
@@ -655,9 +701,11 @@ def initialize_cache_from_supabase():
         # Save to JSON files
         _save_json_cache()
         
-        print(f"✓ Cache initialized from Supabase: {len(supabase_products)} products, {len(supabase_categories)} categories")
+        if IS_PRODUCTION:
+            print(f"✓ Cache initialized from Supabase: {len(supabase_products)} products, {len(supabase_categories)} categories")
         return True
         
     except Exception as e:
-        print(f"Error initializing cache from Supabase: {e}")
+        if IS_PRODUCTION:
+            print(f"Error initializing cache from Supabase: {e}")
         return False

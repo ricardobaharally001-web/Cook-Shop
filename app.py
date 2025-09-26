@@ -19,6 +19,7 @@ from supabase_helpers import (
     delete_item,
     change_item_quantity,
     initialize_cache_from_supabase,
+    refresh_cache_from_supabase,
 )
 
 load_dotenv()
@@ -99,6 +100,44 @@ def admin_logout():
 
 
 # ---------- Admin Dashboard ----------
+
+@app.route("/admin/debug/cache")
+def admin_debug_cache():
+    if not is_logged_in():
+        return redirect(url_for("admin_login"))
+    
+    try:
+        success = refresh_cache_from_supabase()
+        if success:
+            flash("Cache refreshed successfully from Supabase", "success")
+        else:
+            flash("Failed to refresh cache from Supabase", "danger")
+    except Exception as e:
+        flash(f"Error refreshing cache: {e}", "danger")
+    
+    return redirect(url_for("admin_items"))
+
+
+@app.route("/admin/debug/quantity/<int:item_id>")
+def admin_debug_quantity(item_id):
+    if not is_logged_in():
+        return redirect(url_for("admin_login"))
+    
+    try:
+        from supabase_helpers import supabase
+        sb = supabase()
+        res = sb.table("menu_items").select("id,name,quantity").eq("id", item_id).limit(1).execute()
+        
+        if res.data and len(res.data) > 0:
+            item = res.data[0]
+        else:
+            flash(f"Item {item_id} not found in Supabase", "warning")
+    except Exception as e:
+        flash(f"Error checking Supabase quantity: {e}", "danger")
+    
+    return redirect(url_for("admin_home"))
+
+# ---------- Admin Dashboard ---------
 
 @app.route("/admin")
 def admin_home():
@@ -365,9 +404,13 @@ def cart_checkout():
         lines.append(f"{itm['name']} x{qty} - ${line_total:.2f}")
         # Decrement inventory
         try:
-            change_item_quantity(item_id, -int(qty))
-        except Exception:
-            pass
+            success = change_item_quantity(item_id, -int(qty))
+            if not success:
+                print(f"Warning: Failed to update inventory for item {item_id}")
+                flash(f"Warning: Could not update inventory for {itm['name']}", "warning")
+        except Exception as e:
+            print(f"Error updating inventory for item {item_id}: {e}")
+            flash(f"Error updating inventory for {itm['name']}", "danger")
     lines.append("=" * 30)
     lines.append(f"Subtotal: ${subtotal:.2f}")
     message = "\n".join(lines)
