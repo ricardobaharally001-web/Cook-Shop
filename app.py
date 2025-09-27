@@ -1,7 +1,6 @@
 import os
-from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify
+from flask import Flask, render_template, request, redirect, url_for, flash, session
 from dotenv import load_dotenv
-from datetime import datetime
 
 from supabase_helpers import (
     list_categories,
@@ -138,6 +137,7 @@ def admin_debug_quantity(item_id):
     
     return redirect(url_for("admin_home"))
 
+# ---------- Admin Dashboard ---------
 
 @app.route("/admin")
 def admin_home():
@@ -270,19 +270,6 @@ def admin_item_edit(item_id):
     return render_template("admin_item_edit.html", item=item, categories=cats)
 
 
-@app.post("/admin/items/delete")
-def admin_item_delete():
-    if not is_logged_in():
-        return redirect(url_for("admin_login"))
-    iid = request.form.get("id")
-    try:
-        delete_item(iid)
-        flash("Item deleted", "info")
-    except Exception as e:
-        flash(f"Delete failed: {e}", "danger")
-    return redirect(url_for("admin_items"))
-
-
 # ---------- Categories ----------
 
 @app.route("/admin/categories", methods=["GET", "POST"]) 
@@ -337,10 +324,6 @@ def admin_items():
 def cart_view():
     site = _site()
     cart = _cart()
-    
-    # Check if we just completed a checkout
-    checkout_success = session.pop('checkout_success', False)
-    
     items = []
     subtotal = 0.0
     for item_id, qty in cart.items():
@@ -350,19 +333,7 @@ def cart_view():
         line_total = (float(itm.get("price") or 0) * int(qty))
         subtotal += line_total
         items.append({"item": itm, "qty": int(qty), "line_total": line_total})
-    
-    # If checkout was successful and cart is empty, add success parameter
-    if checkout_success and not cart:
-        return redirect(url_for("cart_view") + "?checkout=success")
-    
     return render_template("cart.html", site=site, items=items, subtotal=subtotal)
-
-
-@app.route("/cart/status")
-def cart_status():
-    """API endpoint to check if cart is empty"""
-    cart = _cart()
-    return jsonify({"isEmpty": len(cart) == 0, "itemCount": len(cart)})
 
 
 @app.route("/cart/add", methods=["POST"]) 
@@ -402,32 +373,27 @@ def cart_remove():
         flash("Removed item", "info")
     return redirect(url_for("cart_view"))
 
-
 @app.route("/cart/checkout", methods=["POST"])
 def cart_checkout():
     cart = _cart()
     if not cart:
         flash("Your cart is empty", "warning")
-        return redirect(url_for("cart_view"))
+        return redirect(url_for("cart"))
 
     customer_name = request.form.get("customer_name", "").strip()
     if not customer_name:
         flash("Please enter your name for the order", "danger")
-        return redirect(url_for("cart_view"))
+        return redirect(url_for("cart"))
 
     site = _site()
     whatsapp_phone = site.get("whatsapp_phone") if site else None
     if not whatsapp_phone:
         flash("WhatsApp checkout is not configured", "warning")
-        return redirect(url_for("cart_view"))
+        return redirect(url_for("cart"))
 
     lines = [f"🛒 Order from {customer_name}"]
     lines.append("=" * 30)
     subtotal = 0.0
-    
-    # Track successful inventory updates
-    inventory_errors = []
-    
     for item_id, qty in cart.items():
         itm = get_item(item_id)
         if not itm:
@@ -436,48 +402,26 @@ def cart_checkout():
         line_total = price * int(qty)
         subtotal += line_total
         lines.append(f"{itm['name']} x{qty} - ${line_total:.2f}")
-        
         # Decrement inventory
         try:
             success = change_item_quantity(item_id, -int(qty))
             if not success:
-                inventory_errors.append(itm['name'])
                 print(f"Warning: Failed to update inventory for item {item_id}")
+                flash(f"Warning: Could not update inventory for {itm['name']}", "warning")
         except Exception as e:
-            inventory_errors.append(itm['name'])
             print(f"Error updating inventory for item {item_id}: {e}")
-    
+            flash(f"Error updating inventory for {itm['name']}", "danger")
     lines.append("=" * 30)
     lines.append(f"Subtotal: ${subtotal:.2f}")
-    
-    # Add order timestamp
-    lines.append(f"Time: {datetime.now().strftime('%Y-%m-%d %H:%M')}")
-    
     message = "\n".join(lines)
 
-    # Clear cart first (before redirect)
-    session.pop("cart", None)
-    session.modified = True
-    
-    # Show any inventory warnings
-    if inventory_errors:
-        flash(f"Note: Inventory update pending for: {', '.join(inventory_errors)}", "info")
-    
-    # Redirect to WhatsApp
+    # If WhatsApp configured, redirect to wa.me
     if whatsapp_phone:
         import urllib.parse
-        # Remove any + from the phone number for the URL
-        clean_phone = whatsapp_phone.lstrip('+')
-        url = f"https://wa.me/{clean_phone}?text={urllib.parse.quote(message)}"
-        
-        # Add a success flash message that will show when they return
-        session['checkout_success'] = True
-        
+        url = f"https://wa.me/{whatsapp_phone.lstrip('+')}?text={urllib.parse.quote(message)}"
+        # clear cart after creating URL
+        session.pop("cart", None)
         return redirect(url)
     else:
         flash("WhatsApp checkout is not configured", "warning")
-        return redirect(url_for("cart_view"))
-
-
-if __name__ == "__main__":
-    app.run(debug=True)
+        return redirect(url_for("cart"))
