@@ -1,51 +1,105 @@
 {% extends 'base.html' %}
 {% block content %}
-  <div class="py-4 text-center">
-    <h1 class="display-5">{{ site.brand_name if site and site.brand_name else 'Restaurant Menu' }}</h1>
-    <p class="text-muted">Browse our categories and dishes below.</p>
-  </div>
-
-  {% if categories %}
-    <div class="row g-4">
-      {% for cat in categories %}
-      <div class="col-12">
-        <h3 class="border-bottom pb-2">{{ cat.name }}</h3>
-        {% set items = items_by_cat.get(cat.id, []) %}
-        {% if items %}
-          <div class="row g-3 mb-4">
-            {% for item in items %}
-              <div class="col-md-6">
-                <div class="list-group-item p-3 d-flex align-items-center">
-                  {% if item.image_url %}
-                    <img src="{{ item.image_url }}" alt="" class="me-3" style="height:64px;width:64px;object-fit:cover;border-radius:10px;">
-                  {% endif %}
-                  <div class="flex-grow-1">
-                    <div class="d-flex justify-content-between align-items-center">
-                      <div class="fw-bold">{{ item.name }}</div>
-                      {% if item.price is not none %}
-                        <span class="badge bg-dark rounded-pill">${{ '%.2f'|format(item.price) }}</span>
-                      {% endif %}
-                    </div>
-                    {% if item.description %}<div class="small text-muted">{{ item.description }}</div>{% endif %}
-                    <div class="small mt-1">In stock: {{ item.quantity if item.quantity is not none else 0 }}</div>
-                    <form class="mt-2 d-flex align-items-center gap-2" method="post" action="/cart/add">
-                      <input type="hidden" name="item_id" value="{{ item.id }}">
-                      {% set stock = item.quantity if item.quantity is not none else 0 %}
-                      <input type="number" class="form-control form-control-sm" name="qty" value="1" min="1" {% if stock>0 %}max="{{ stock }}"{% endif %} style="width:90px" {% if stock<=0 %}disabled{% endif %}>
-                      <button class="btn btn-sm btn-dark" {% if stock<=0 %}disabled{% endif %}>{% if stock<=0 %}Sold out{% else %}Add to Cart{% endif %}</button>
-                    </form>
-                  </div>
+    <!-- Hero Section -->
+    <section class="relative bg-gradient-to-br from-primary-50 to-accent-50 overflow-hidden">
+        <div class="absolute inset-0 bg-black opacity-20"></div>
+        <div class="absolute inset-0">
+            <img src="https://images.pexels.com/photos/1581384/pexels-photo-1581384.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=2" alt="Restaurant Interior" class="w-full h-full object-cover" loading="lazy" onerror="this.src='https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?q=80&w=2940&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D'; this.onerror=null;" />
+        </div>
+        
+        <div class="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24 lg:py-32">
+            <div class="text-center">
+                <h1 class="text-4xl md:text-6xl font-bold text-white mb-6 font-accent">
+                    Welcome to {{ site.brand_name if site and site.brand_name else 'Restaurant Menu' }}
+                </h1>
+                <p class="text-xl md:text-2xl text-gray-200 mb-8 max-w-3xl mx-auto">
+                    Discover exceptional flavors and culinary delights. Order your favorites with seamless convenience.
+                </p>
+                
+                <div class="flex flex-col sm:flex-row gap-4 justify-center items-center">
+                    <a href="#menu" class="btn-primary text-lg px-8 py-4 hover-lift click-feedback">
+                        Explore Our Menu
+                        <svg class="w-5 h-5 ml-2 inline" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M13 7l5 5-5 5M6 7l5 5-5 5"/>
+                        </svg>
+                    </a>
+                    <a href="/cart" class="btn-secondary text-lg px-8 py-4 hover-lift click-feedback">
+                        View Cart
+                    </a>
                 </div>
-              </div>
-            {% endfor %}
-          </div>
-        {% else %}
-          <p class="text-muted">No items yet.</p>
-        {% endif %}
-      </div>
-      {% endfor %}
-    </div>
-  {% else %}
-    <p class="text-muted">No categories yet.</p>
-  {% endif %}
+            </div>
+        </div>
+
+        <!-- Floating Stats -->
+        <div class="absolute bottom-8 left-1/2 transform -translate-x-1/2 hidden lg:flex space-x-8">
+            <div class="bg-white bg-opacity-90 backdrop-blur-sm rounded-lg px-6 py-3 text-center">
+                <div class="text-2xl font-bold text-primary">{{ categories|length if categories else 0 }}</div>
+                <div class="text-sm text-text-secondary">Categories</div>
+            </div>
+            <div class="bg-white bg-opacity-90 backdrop-blur-sm rounded-lg px-6 py-3 text-center">
+                <div class="text-2xl font-bold text-accent">Fresh</div>
+                <div class="text-sm text-text-secondary">Daily</div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Menu Section -->
+    <section id="menu" class="py-16 bg-background">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-12">
+                <h2 class="text-3xl md:text-4xl font-bold text-text-primary mb-4">Our Menu</h2>
+                <p class="text-lg text-text-secondary max-w-2xl mx-auto">Browse our categories and discover your next favorite dish</p>
+            </div>
+
+            {% if categories %}
+                <div class="space-y-12">
+                    {% for cat in categories %}
+                        <div class="category-section">
+                            <h3 class="text-2xl font-bold text-text-primary mb-6 pb-2 border-b border-gray-200">{{ cat.name }}</h3>
+                            {% set items = items_by_cat.get(cat.id, []) %}
+                            {% if items %}
+                                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                    {% for item in items %}
+                                        <div class="bg-surface rounded-lg shadow-card hover:shadow-card-hover transition-shadow duration-200 overflow-hidden">
+                                            {% if item.image_url %}
+                                                <img src="{{ item.image_url }}" alt="{{ item.name }}" class="w-full h-48 object-cover" />
+                                            {% endif %}
+                                            <div class="p-6">
+                                                <div class="flex justify-between items-start mb-2">
+                                                    <h4 class="text-lg font-semibold text-text-primary">{{ item.name }}</h4>
+                                                    {% if item.price is not none %}
+                                                        <span class="text-lg font-bold text-primary">${{ '%.2f'|format(item.price) }}</span>
+                                                    {% endif %}
+                                                </div>
+                                                {% if item.description %}
+                                                    <p class="text-text-secondary mb-4">{{ item.description }}</p>
+                                                {% endif %}
+                                                <div class="flex justify-between items-center mb-4">
+                                                    <span class="text-sm text-text-secondary">Stock: {{ item.quantity if item.quantity is not none else 0 }}</span>
+                                                </div>
+                                                <form method="post" action="/cart/add" class="flex gap-2">
+                                                    <input type="hidden" name="item_id" value="{{ item.id }}">
+                                                    {% set stock = item.quantity if item.quantity is not none else 0 %}
+                                                    <input type="number" class="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary" name="qty" value="1" min="1" {% if stock>0 %}max="{{ stock }}"{% endif %} {% if stock<=0 %}disabled{% endif %}>
+                                                    <button class="px-4 py-2 bg-primary text-white rounded-md hover:bg-primary-hover transition-colors duration-200 {% if stock<=0 %}opacity-50 cursor-not-allowed{% endif %}" {% if stock<=0 %}disabled{% endif %}>
+                                                        {% if stock<=0 %}Sold out{% else %}Add{% endif %}
+                                                    </button>
+                                                </form>
+                                            </div>
+                                        </div>
+                                    {% endfor %}
+                                </div>
+                            {% else %}
+                                <p class="text-text-secondary italic">No items in this category yet.</p>
+                            {% endif %}
+                        </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <div class="text-center py-12">
+                    <p class="text-text-secondary text-lg">No categories available yet.</p>
+                </div>
+            {% endif %}
+        </div>
+    </section>
 {% endblock %}

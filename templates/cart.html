@@ -5,77 +5,52 @@
     <a class="btn btn-outline-secondary btn-sm" href="/">Continue browsing</a>
   </div>
 
-  <div id="cartContent">
-    {% if items %}
-      <div class="table-responsive mb-3">
-        <table class="table align-middle">
-          <thead>
-            <tr>
-              <th>Item</th>
-              <th style="width:120px">Qty</th>
-              <th style="width:140px">Line Total</th>
-              <th style="width:120px"></th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for row in items %}
-            <tr>
-              <td>
-                <div class="fw-semibold">{{ row.item.name }}</div>
-                {% if row.item.description %}<div class="small text-muted">{{ row.item.description }}</div>{% endif %}
-              </td>
-              <td>{{ row.qty }}</td>
-              <td>${{ '%.2f'|format(row.line_total) }}</td>
-              <td>
-                <form method="post" action="/cart/remove">
-                  <input type="hidden" name="item_id" value="{{ row.item.id }}">
-                  <button class="btn btn-sm btn-outline-danger">Remove</button>
-                </form>
-              </td>
-            </tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-
-      <div class="card shadow-sm">
-        <div class="card-body">
-          <div class="d-flex justify-content-between align-items-center">
-            <div>
-              <div class="fw-semibold">Subtotal</div>
-              <div class="h5 m-0">${{ '%.2f'|format(subtotal) }}</div>
-            </div>
-            <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#customerNameModal">Checkout with WhatsApp</button>
-          </div>
-        </div>
-      </div>
-    {% else %}
-      <div class="text-center py-5">
-        <div class="mb-3">
-          <svg width="64" height="64" fill="currentColor" class="text-muted" viewBox="0 0 16 16">
-            <path d="M0 2.5A.5.5 0 0 1 .5 2H2a.5.5 0 0 1 .485.379L2.89 4H14.5a.5.5 0 0 1 .485.621l-1.5 6A.5.5 0 0 1 13 11H4a.5.5 0 0 1-.485-.379L1.61 3H.5a.5.5 0 0 1-.5-.5zM3.14 5l1.25 5h8.22l1.25-5H3.14zM5 13a1 1 0 1 0 0 2 1 1 0 0 0 0-2zm-2 1a2 2 0 1 1 4 0 2 2 0 0 1-4 0zm9-1a1 1 0 1 0 0 2 1 1 0 0 0 0-2zm-2 1a2 2 0 1 1 4 0 2 2 0 0 1-4 0z"/>
-          </svg>
-        </div>
-        <h4 class="text-muted mb-3">Your cart is empty</h4>
-        <p class="text-muted mb-4">Add some delicious items from our menu!</p>
-        <a href="/" class="btn btn-primary">Browse Menu</a>
-      </div>
-    {% endif %}
-  </div>
-
-  <!-- Success Message (Initially Hidden) -->
-  <div id="orderSuccess" class="d-none">
-    <div class="text-center py-5">
-      <div class="mb-3">
-        <svg width="64" height="64" fill="currentColor" class="text-success" viewBox="0 0 16 16">
-          <path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zm-3.97-3.03a.75.75 0 0 0-1.08.022L7.477 9.417 5.384 7.323a.75.75 0 0 0-1.06 1.06L6.97 11.03a.75.75 0 0 0 1.079-.02l3.992-4.99a.75.75 0 0 0-.01-1.05z"/>
-        </svg>
-      </div>
-      <h4 class="text-success mb-3">Order Sent Successfully!</h4>
-      <p class="text-muted mb-4">Your order has been sent via WhatsApp. We'll process it shortly!</p>
-      <a href="/" class="btn btn-primary">Continue Shopping</a>
+  {% if items %}
+    <div class="table-responsive mb-3">
+      <table class="table align-middle">
+        <thead>
+          <tr>
+            <th>Item</th>
+            <th style="width:120px">Qty</th>
+            <th style="width:140px">Line Total</th>
+            <th style="width:120px"></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in items %}
+          <tr>
+            <td>
+              <div class="fw-semibold">{{ row.item.name }}</div>
+              {% if row.item.description %}<div class="small text-muted">{{ row.item.description }}</div>{% endif %}
+            </td>
+            <td>{{ row.qty }}</td>
+            <td>${{ '%.2f'|format(row.line_total) }}</td>
+            <td>
+              <form method="post" action="/cart/remove">
+                <input type="hidden" name="item_id" value="{{ row.item.id }}">
+                <button class="btn btn-sm btn-outline-danger">Remove</button>
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
     </div>
-  </div>
+
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center">
+          <div>
+            <div class="fw-semibold">Subtotal</div>
+            <div class="h5 m-0">${{ '%.2f'|format(subtotal) }}</div>
+          </div>
+          <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#customerNameModal">Checkout with WhatsApp</button>
+        </div>
+      </div>
+    </div>
+  {% else %}
+    <p class="text-muted">Your cart is empty.</p>
+  {% endif %}
 
   <!-- Customer Name Modal -->
   <div class="modal fade" id="customerNameModal" tabindex="-1" aria-labelledby="customerNameModalLabel" aria-hidden="true">
@@ -85,7 +60,7 @@
           <h5 class="modal-title" id="customerNameModalLabel">Enter Your Name</h5>
           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
         </div>
-        <form method="post" action="/cart/checkout" id="checkoutForm">
+        <form method="post" action="/cart/checkout" onsubmit="closeModalAndShowSuccess()">
           <div class="modal-body">
             <div class="mb-3">
               <label for="customerName" class="form-label">Full Name <span class="text-danger">*</span></label>
@@ -95,10 +70,7 @@
           </div>
           <div class="modal-footer">
             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-            <button type="submit" class="btn btn-success" id="sendOrderBtn">
-              <span class="spinner-border spinner-border-sm d-none me-2" role="status" aria-hidden="true"></span>
-              Send Order via WhatsApp
-            </button>
+            <button type="submit" class="btn btn-success">Send Order via WhatsApp</button>
           </div>
         </form>
       </div>
@@ -108,89 +80,32 @@
 
 {% block scripts %}
 <script>
-// Auto-refresh when page becomes visible again
-document.addEventListener('visibilitychange', function() {
-    if (!document.hidden) {
-        // Check if we should refresh (after WhatsApp redirect)
-        const shouldRefresh = sessionStorage.getItem('cartCheckoutInProgress');
-        if (shouldRefresh === 'true') {
-            sessionStorage.removeItem('cartCheckoutInProgress');
-            // Refresh the page to get updated cart status
-            window.location.reload();
-        }
-    }
-});
-
-// Handle form submission
-document.getElementById('checkoutForm').addEventListener('submit', function(e) {
-    // Show loading state
-    const btn = document.getElementById('sendOrderBtn');
-    btn.querySelector('.spinner-border').classList.remove('d-none');
-    btn.disabled = true;
+function closeModalAndShowSuccess() {
+  // Close the modal
+  const modal = bootstrap.Modal.getInstance(document.getElementById('customerNameModal'));
+  if (modal) {
+    modal.hide();
+  }
+  
+  // Show success message
+  setTimeout(function() {
+    // Create and show a temporary success alert
+    const alertDiv = document.createElement('div');
+    alertDiv.className = 'alert alert-success alert-dismissible fade show position-fixed';
+    alertDiv.style.cssText = 'top: 20px; right: 20px; z-index: 9999; min-width: 300px;';
+    alertDiv.innerHTML = `
+      <strong>📱 Order Sent!</strong> Redirecting you to WhatsApp...
+      <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    document.body.appendChild(alertDiv);
     
-    // Mark checkout in progress
-    sessionStorage.setItem('cartCheckoutInProgress', 'true');
-    
-    // Close modal
-    const modal = bootstrap.Modal.getInstance(document.getElementById('customerNameModal'));
-    if (modal) {
-        modal.hide();
-    }
-    
-    // Show success message temporarily
+    // Auto-dismiss after 3 seconds
     setTimeout(function() {
-        document.getElementById('cartContent').classList.add('d-none');
-        document.getElementById('orderSuccess').classList.remove('d-none');
-    }, 500);
-});
-
-// Check URL parameters for checkout success
-window.addEventListener('load', function() {
-    const urlParams = new URLSearchParams(window.location.search);
-    if (urlParams.get('checkout') === 'success') {
-        // Show success message
-        document.getElementById('cartContent').classList.add('d-none');
-        document.getElementById('orderSuccess').classList.remove('d-none');
-        // Clean URL
-        window.history.replaceState({}, document.title, '/cart');
-    }
-});
-
-// Periodically check cart status when page is visible
-let checkInterval;
-function startCartCheck() {
-    checkInterval = setInterval(async function() {
-        if (!document.hidden && sessionStorage.getItem('cartCheckoutInProgress') === 'true') {
-            try {
-                const response = await fetch('/cart/status', {
-                    headers: {
-                        'X-Requested-With': 'XMLHttpRequest'
-                    }
-                });
-                const data = await response.json();
-                if (data.isEmpty) {
-                    sessionStorage.removeItem('cartCheckoutInProgress');
-                    window.location.reload();
-                }
-            } catch (e) {
-                console.error('Error checking cart status:', e);
-            }
-        }
-    }, 2000); // Check every 2 seconds
+      if (alertDiv.parentNode) {
+        alertDiv.remove();
+      }
+    }, 3000);
+  }, 500);
 }
-
-// Start checking when page loads
-if (sessionStorage.getItem('cartCheckoutInProgress') === 'true') {
-    startCartCheck();
-}
-
-// Clean up interval when page is hidden
-document.addEventListener('visibilitychange', function() {
-    if (document.hidden && checkInterval) {
-        clearInterval(checkInterval);
-    } else if (!document.hidden && sessionStorage.getItem('cartCheckoutInProgress') === 'true') {
-        startCartCheck();
-    }
-});
 </script>
 {% endblock %}
